@@ -188,6 +188,20 @@ parser.add_argument(
          "convenient way to preview OCR quality). The output file and sidecar "
          "may not both use stdout at the same time.")
 
+# Use null string '\0' as sentinel to indicate the user supplied no argument,
+# since that is the only invalid character for filepaths on all platforms
+# bool('\0') is True in Python
+parser.add_argument(
+    '--sidecar-hocr', nargs='?', const='\0', default=None, metavar='FILE',
+    help="Generate sidecar hocr files that contain the hocr metadata generated "
+         "by Tesseract. The hocr includes word confidence, paragraphs, lines, "
+         "reconized words, and bounding boxes. An example use is PDF highlighting "
+         "and linking. If FILE is omitted, the sidecar file be named"
+         "{output_file}.hocr. If FILE is set to '-', the sidecar is written to"
+         "stdout (a convenient way to preview OCR quality). The output file and "
+         "sidecar may not both use stdout at the same time.")
+
+
 parser.add_argument(
     '--version', action='version', version=VERSION,
     help="Print program version and exit")
@@ -466,6 +480,15 @@ def check_options_sidecar(options, log):
                 "stdout.")
         options.sidecar = options.output_file + '.txt'
 
+def check_options_sidecar_hocr(options, log):
+    if options.sidecar_hocr == '\0':
+        if options.output_file == '-':
+            raise argparse.ArgumentError(
+                None,
+                "--sidecar-hocr filename must be specified when output file is "
+                "stdout.")
+        options.sidecar_hocr = options.output_file + '.hocr'
+
 
 def _optional_program_check(name, version_fn, min_version, for_argument):
     try:
@@ -546,6 +569,7 @@ def check_options(options, log):
         check_options_metadata(options, log)
         check_options_output(options, log)
         check_options_sidecar(options, log)
+        check_options_sidecar_hocr(options, log)
         check_options_preprocessing(options, log)
         check_options_ocr_behavior(options, log)
         check_options_optimizing(options, log)

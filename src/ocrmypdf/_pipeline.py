@@ -862,6 +862,51 @@ def merge_sidecars(
         with open(output_file, 'w', encoding="utf-8") as out:
             write_pages(out)
 
+def merge_sidecars_hocr(
+        input_files_groups,
+        output_file,
+        log,
+        context):
+    pdfinfo = context.get_pdfinfo()
+
+    hocr_files = [None] * len(pdfinfo)
+
+    for infile in flatten_groups(input_files_groups):
+        if infile.endswith('.hocr'):
+            idx = page_number(infile) - 1
+            hocr_files[idx] = infile
+
+    last_idx = len(hocr_files) - 1;
+
+    def write_pages(stream):
+        for page_num, hocr_file in enumerate(hocr_files):
+            if hocr_file:
+                with open(hocr_file, 'r', encoding="utf-8") as in_:
+                    s = in_.read()
+                    res_start = s.rindex('<body>') + 6 + 1
+                    res_end = s.rindex('</body>') - 1
+                    if not endStr:
+                        # write the inital boilerplate xml
+                        stream.write(s[:res_start - 1])
+                        # store the ending boilerplate xml
+                        endStr = s[res_end + 1:]
+                    # append the page's hocr
+                    stream.write(s[res_start:res_end])
+            else:
+                stream.write('[OCR hocr skipped on page {}]'.format(
+                        page_num + 1))
+            
+            if page_num == last_idx:
+              # write the ending boilerplate xml
+              stream.write(endStr)
+
+    if output_file == '-':
+        write_pages(sys.stdout)
+        sys.stdout.flush()
+    else:
+        with open(output_file, 'w', encoding="utf-8") as out:
+            write_pages(out)
+
 
 def copy_final(
         input_files,
@@ -1058,6 +1103,13 @@ def build_pipeline(options, work_folder, log, context):
         output=options.sidecar,
         extras=[log, context])
     task_merge_sidecars.active_if(options.sidecar)
+
+    task_merge_sidecars_hocr = main_pipeline.merge(
+        task_func=merge_sidecars_hocr,
+        input=[task_ocr_tesseract_hocr],
+        output=options.sidecar_hocr,
+        extras=[log, context])
+    task_merge_sidecars_hocr.active_if(options.sidecar_hocr)
 
     # Optimize
     task_optimize_pdf = main_pipeline.transform(
